@@ -96,7 +96,7 @@ int pos=0;
         item.trim();
         value=line.substring(pos+1);
         value.trim();
-        //DBG Serial.printf("[PREFS] Preference (=@%d) item: '%s' = '%s'\n",pos,item.c_str(),value.c_str());
+        DBG Serial.printf("[PREFS] Preference (=@%d) item: '%s' = '%s'\n",pos,item.c_str(),value.c_str());
         
         if(item.length()>2 && value.length()>0) Change_prefs_value(item,value);
       }
@@ -197,6 +197,10 @@ char tmp[30];
       case PRF_PID_ALGORITHM:  // how often recalculate SSR on/off - 5 second window default
         Prefs[PRF_PID_ALGORITHM].type=UINT16;
         Prefs[PRF_PID_ALGORITHM].value.uint16=5;
+        break;
+      case PRF_PID_AUTO_SETPOINT:  // auto pid setpoint
+        Prefs[PRF_PID_AUTO_SETPOINT].type=VFLOAT;
+        Prefs[PRF_PID_AUTO_SETPOINT].value.vfloat=60.0;
         break;
       case PRF_PID_WINDOW:  // how often recalculate SSR on/off - 5 second window default
         Prefs[PRF_PID_WINDOW].type=UINT16;

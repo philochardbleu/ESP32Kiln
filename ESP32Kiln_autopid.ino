@@ -1,11 +1,10 @@
 
 #include <PID_v1.h>
-#include <PID_AutoTune_v0.h> // https://github.com/t0mpr1c3/Arduino-PID-AutoTune-Library
+#include <sTune.h>
 
 #define DEFAULT_TEMP_RISE_AFTER_OFF 30.0
 #define CONTROL_HYSTERISIS .01
 
-double _CALIBRATE_max_temperature;
 int measureInterval = 500;
 int tuner_id = 5;
 double tuner_noise_band = 1;
@@ -15,44 +14,84 @@ float _calP = .5 / DEFAULT_TEMP_RISE_AFTER_OFF;
 float _calD = 5.0 / DEFAULT_TEMP_RISE_AFTER_OFF;
 float _calI = 4 / DEFAULT_TEMP_RISE_AFTER_OFF;
 
-PID_ATune aTune(&kiln_temp, &pid_out, &set_temp, &now, DIRECT);
+uint32_t settleTimeSec = 10;
+uint32_t testTimeSec = 500;  // runPid interval = testTimeSec / samples
+const uint16_t samples = 500;
+const float inputSpan = 200;
+const float outputSpan = 1000;
+float outputStart = 0;
+float outputStep = 50;
+float tempLimit = 300;
+uint8_t debounce = 0;
+bool startup = true;
 
-void CalibrateInit()
-{
-    Program_run_state = PR_CALIBRATE;    
-    measureInterval = Prefs[PRF_PID_MEASURE_INTERVAL].value.uint16;
-    tuner_id = Prefs[PRF_PID_ALGORITHM].value.uint8;
+float Input, Output, Setpoint = 80, Kp, Ki, Kd;  // sTune
 
-    Enable_EMR();
-    aTune.Cancel();                         // just in case
-    aTune.SetNoiseBand(tuner_noise_band);   // noise band +-1*C
-    aTune.SetOutputStep(tuner_output_step); // change output +-.5 around initial output
-    aTune.SetControlType(tuner_id);
-    aTune.SetLookbackSec(measureInterval * 100);
-    aTune.SetSampleTime(measureInterval);
-    aTune.Runtime(); // initialize autotuner here, as later we give it actual readings
+sTune tuner = sTune(&Input, &Output, tuner.ZN_PID, tuner.directIP, tuner.printOFF);
+
+void CalibrateInit() {
+  Program_run_state = PR_CALIBRATE;
+
+  Output = 0;
+
+
+#ifdef EMR_RELAY_PIN
+  Enable_EMR();
+#endif
+
+  tuner.Configure(inputSpan, outputSpan, outputStart, outputStep, testTimeSec, settleTimeSec, samples);
+  tuner.SetEmergencyStop(tempLimit);
+
+  tuner.SetTuningMethod(tuner.ZN_PID);
+
+
+  KilnPID.SetProportionalMode(KilnPID.pMode::pOnError);
+  KilnPID.SetDerivativeMode(KilnPID.dMode::dOnError);
+  KilnPID.SetAntiWindupMode(KilnPID.iAwMode::iAwClamp);
+
+  Setpoint = Prefs[PRF_PID_AUTO_SETPOINT].value.vfloat;
+  set_temp = Setpoint;
 }
 
-void HandleCalibration(unsigned long now)
-{
-    if (aTune.Runtime())
-    {
-        Program_run_state = PR_NONE; // end calibration
-        Disable_EMR();
-        Disable_SSR();
-        _calP = aTune.GetKp();
-        _calI = aTune.GetKi();
-        _calD = aTune.GetKd();
-        DBG dbgLog(LOG_DEBUG, "[PID] Calibration data available: PID = [%f, %f, %f]", _calP, _calI, _calD);
-    }
+void HandleCalibration(unsigned long now) {
+  float optimumOutput = tuner.softPwm(SSR1_RELAY_PIN, Input, Output, Setpoint, outputSpan, debounce);
 
-    handle_pid(now);
-    _CALIBRATE_max_temperature = max(_CALIBRATE_max_temperature, kiln_temp);
-}
+  switch (tuner.Run()) {
+    case tuner.sample:
+      Update_TemperatureA();
+      Input = kiln_temp;
+      break;
 
-void handle_pid(unsigned long now)
-{
-    bool heater = (now - windowStartTime < (measureInterval * pid_out) && pid_out > CONTROL_HYSTERISIS) ||
-                  (now - windowStartTime >= (measureInterval * pid_out) && pid_out > 1.0 - CONTROL_HYSTERISIS);
-    heater ? Enable_SSR() : Disable_SSR();
+    case tuner.tunings:                     // active just once when sTune is done
+      tuner.GetAutoTunings(&Kp, &Ki, &Kd);  // sketch variables updated by sTune
+      KilnPID.SetOutputLimits(0, outputSpan * 0.1);
+      KilnPID.SetSampleTimeUs((outputSpan - 1) * 1000);
+      debounce = 0;  // ssr mode
+      Output = outputStep;
+      KilnPID.SetTunings(Kp, Ki, Kd);  // update PID with the new tunings
+      DBG dbgLog(LOG_INFO, "[AutoPID] Tuning complete Kp: %.2f \t Ki %.2f \t Kd = %.2f\n", Kp, Ki, Kd);
+      Program_run_state = PR_ENDED;
+      KilnPID.SetMode(KilnPID.Control::manual);
+      Disable_SSR();
+
+      Change_prefs_value(PrefsName[PRF_PID_KP], String(Kp));
+      Change_prefs_value(PrefsName[PRF_PID_KI], String(Ki));
+      Change_prefs_value(PrefsName[PRF_PID_KD], String(Kd));
+
+      Save_prefs();
+      break;
+
+    case tuner.runPid:  // active once per sample after tunings
+      if (startup && Input > Setpoint - 5) {
+        startup = false;
+        Output -= 9;
+        KilnPID.SetMode(KilnPID.Control::manual);
+        KilnPID.SetMode(KilnPID.Control::automatic);
+      }
+      Update_TemperatureA();
+      Input = kiln_temp;
+      KilnPID.Compute();
+      Output = pid_out;
+      break;
+  }
 }
