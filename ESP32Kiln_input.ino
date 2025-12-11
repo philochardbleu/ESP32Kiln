@@ -116,7 +116,7 @@ void Rotate(){
 
 
 
-
+#ifdef ENCODER0_PINA
 // Main input loop task function
 //
 void Input_Loop(void * parameter) {
@@ -168,7 +168,6 @@ void handleInterrupt() {
 // Setup all input pins and interrupts
 //
 void Setup_Input() {
-
   pinMode(ENCODER0_PINA, INPUT_PULLUP); 
   pinMode(ENCODER0_PINB, INPUT_PULLUP);
   pinMode(ENCODER0_BUTTON, INPUT_PULLUP);
@@ -190,3 +189,4 @@ void Setup_Input() {
               1,                /* Priority of the task. */
               NULL,0);            /* Task handle. */
 }
+#endif

@@ -96,7 +96,7 @@ int pos=0;
         item.trim();
         value=line.substring(pos+1);
         value.trim();
-        //DBG Serial.printf("[PREFS] Preference (=@%d) item: '%s' = '%s'\n",pos,item.c_str(),value.c_str());
+        DBG Serial.printf("[PREFS] Preference (=@%d) item: '%s' = '%s'\n",pos,item.c_str(),value.c_str());
         
         if(item.length()>2 && value.length()>0) Change_prefs_value(item,value);
       }
@@ -194,10 +194,13 @@ char tmp[30];
         Prefs[PRF_INIT_TIME].type=STRING;
         Prefs[PRF_INIT_TIME].value.str=strdup("00:00:00");
         break;
-
       case PRF_PID_ALGORITHM:  // how often recalculate SSR on/off - 5 second window default
         Prefs[PRF_PID_ALGORITHM].type=UINT16;
         Prefs[PRF_PID_ALGORITHM].value.uint16=5;
+        break;
+      case PRF_PID_AUTO_SETPOINT:  // auto pid setpoint
+        Prefs[PRF_PID_AUTO_SETPOINT].type=VFLOAT;
+        Prefs[PRF_PID_AUTO_SETPOINT].value.vfloat=60.0;
         break;
       case PRF_PID_WINDOW:  // how often recalculate SSR on/off - 5 second window default
         Prefs[PRF_PID_WINDOW].type=UINT16;
@@ -222,6 +225,10 @@ char tmp[30];
       case PRF_PID_TEMP_THRESHOLD:  // allowed difference in temperature between set and current when controller will go in dwell mode
         Prefs[PRF_PID_TEMP_THRESHOLD].type=INT16;
         Prefs[PRF_PID_TEMP_THRESHOLD].value.int16=-1;
+        break;
+      case PRF_PID_MEASURE_INTERVAL:  // how often PID will measure temperature
+        Prefs[PRF_PID_MEASURE_INTERVAL].type=UINT16;
+        Prefs[PRF_PID_MEASURE_INTERVAL].value.uint16=500; // 500 ms
         break;
       case PRF_LOG_WINDOW:
         Prefs[PRF_LOG_WINDOW].type=UINT16;
