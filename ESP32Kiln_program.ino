@@ -300,8 +300,15 @@ void END_Program() {
 
   DBG dbgLog(LOG_INFO, "[PRG] Ending program cleanly\n");
   Program_run_state = PR_ENDED;
-  KilnPID.Reset();
+
+#ifdef PID_QUICKPID
   KilnPID.SetMode(KilnPID.Control::manual);
+#elif defined(PID_PID_V1)
+  KilnPID.SetMode(MANUAL);
+#elif defined(PID_AUTOTUNEPID)
+  KilnPID.setOperationalMode(OperationalMode::Hold);
+#endif
+
   Disable_SSR();
 
 #ifdef EMR_RELAY_PIN
@@ -424,8 +431,12 @@ void Program_calculate_steps(boolean prg_start = false) {
           DBG dbgLog(LOG_DEBUG, "[PRG] temp_inc:%f Step_temp:%d Step-1_temp:%d\n", temp_incr, Program_run[Program_run_step].temp, Program_run[Program_run_step - 1].temp);
         } else {  // or this is teh first one?
           DBG dbgLog(LOG_DEBUG, "[DBG] First step.\n");
-          // set_temp = kiln_temp;
-          set_temp = Program_run[Program_run_step].temp;
+          set_temp = kiln_temp;
+#if defined(PID_AUTOTUNEPID)
+          float temp = set_temp;
+          KilnPID.setSetpoint(temp);
+#endif
+          // set_temp = Program_run[Program_run_step].temp;
           temp_incr = (float)(Program_run[Program_run_step].temp - kiln_temp) / (Program_run[Program_run_step].togo * 60);
         }
         Program_recalculate_ETA(false);  // recalculate ETA for normal step
@@ -436,6 +447,10 @@ void Program_calculate_steps(boolean prg_start = false) {
         step_start = time(NULL);
         next_step_end = step_start + Program_run[Program_run_step].dwell * 60;
         set_temp = Program_run[Program_run_step].temp;
+#if defined(PID_AUTOTUNEPID)
+          float temp = set_temp;
+        KilnPID.setSetpoint(temp);
+#endif
         DBG dbgLog(LOG_DEBUG, "[PRG] Next step:%d Start step:%d Togo:%d Run_step:%d/%d Set_temp:%f\n", next_step_end, step_start, Program_run[Program_run_step].dwell, Program_run_step, Program_run_size, set_temp);
         Program_recalculate_ETA(true);  // recalculate ETA for dwell
       }
@@ -464,10 +479,24 @@ void START_Program() {
   Enable_EMR();
 #endif
 
-  KilnPID.SetTunings(Prefs[PRF_PID_KP].value.vfloat, Prefs[PRF_PID_KI].value.vfloat, Prefs[PRF_PID_KD].value.vfloat);  // set actual PID parameters
-  KilnPID.SetProportionalMode(KilnPID.pMode::pOnError);
-  KilnPID.SetDerivativeMode(KilnPID.dMode::dOnError);
-  KilnPID.SetAntiWindupMode(KilnPID.iAwMode::iAwClamp);
+#ifdef PID_QUICKPID
+  KilnPID.SetTunings(Prefs[PRF_PID_KP].value.vfloat,
+                     Prefs[PRF_PID_KI].value.vfloat,
+                     Prefs[PRF_PID_KD].value.vfloat,
+                     KilnPID.pMode::pOnMeas,
+                     KilnPID.dMode::dOnMeas,
+                     KilnPID.iAwMode::iAwCondition);
+#elif defined(PID_PID_V1)
+  KilnPID.SetTunings(Prefs[PRF_PID_KP].value.vfloat,
+                     Prefs[PRF_PID_KI].value.vfloat,
+                     Prefs[PRF_PID_KD].value.vfloat);
+#elif defined(PID_AUTOTUNEPID)
+  KilnPID.setTuningMethod(TuningMethod::Manual);
+  KilnPID.setManualGains(Prefs[PRF_PID_KP].value.vfloat,
+                         Prefs[PRF_PID_KI].value.vfloat,
+                         Prefs[PRF_PID_KD].value.vfloat);
+#endif
+
   Program_run_start = time(NULL);
   Program_calculate_steps(true);
   windowStartTime = millis();
@@ -476,9 +505,20 @@ void START_Program() {
 
 
   //tell the PID to range between 0 and the full window size/PID_WINDOW_DIVIDER. It's divided by 100 (default value of PID_WINDOW_DIVIDER) to have minimal window size faster above 1/25s - so SSR will be able to switch (zero switch)
-  KilnPID.SetOutputLimits(0, Prefs[PRF_PID_WINDOW].value.uint16);
+
+#ifdef PID_QUICKPID
+  KilnPID.SetOutputLimits(0, Prefs[PRF_PID_WINDOW].value.uint16 / PID_WINDOW_DIVIDER * 0.1);
+  KilnPID.SetSampleTimeUs(Prefs[PRF_PID_WINDOW].value.uint16 * 1000);
   KilnPID.SetMode(KilnPID.Control::automatic);
-  KilnPID.SetSampleTimeUs(Prefs[PRF_PID_WINDOW].value.uint16);
+#elif defined(PID_PID_V1)
+  KilnPID.SetOutputLimits(MIN_WINDOW, Prefs[PRF_PID_WINDOW].value.uint16 / PID_WINDOW_DIVIDER * 0.1);
+  KilnPID.SetSampleTime(Prefs[PRF_PID_WINDOW].value.uint16);
+  KilnPID.SetMode(AUTOMATIC);
+#elif defined(PID_AUTOTUNEPID)
+  KilnPID.setSetpoint(kiln_temp);
+  KilnPID.setOscillationMode(OscillationMode::Half);
+  KilnPID.setOperationalMode(OperationalMode::Normal);
+#endif
 
   DBG dbgLog(LOG_INFO, "[PRG] Trying to start log - window size:%d\n", Prefs[PRF_LOG_WINDOW].value.uint16);
   if (Prefs[PRF_LOG_WINDOW].value.uint16) {  // if we should create log file
@@ -499,10 +539,12 @@ void SAFETY_Check() {
     DBG dbgLog(LOG_ERR, "[PRG] Safety check failed - MAX temperature > %d\n", Prefs[PRF_MAX_TEMP].value.uint16);
     ABORT_Program(PR_ERR_TOO_HOT);
   }
+#ifdef MAX31865_E
   if (case_temp > Prefs[PRF_MAX_HOUSING_TEMP].value.uint16) {
     DBG dbgLog(LOG_ERR, "[PRG] Safety check failed - MAX housing temperature > %d\n", Prefs[PRF_MAX_HOUSING_TEMP].value.uint16);
     ABORT_Program(PR_ERR_TOO_HOT_HOUSING);
   }
+#endif
 }
 
 
@@ -553,7 +595,7 @@ void Program_Loop(void *parameter) {
 
       // Calibrate
       if (Program_run_state == PR_CALIBRATE) {
-        HandleCalibration(now);
+        HandleCalibration();
       } else {
 
         if (Program_run_state == PR_RUNNING || Program_run_state == PR_PAUSED || Program_run_state == PR_THRESHOLD) {
@@ -572,58 +614,87 @@ void Program_Loop(void *parameter) {
       }
 
       // Do the PID stuff
+#if defined(PID_QUICKPID) || defined(PID_PID_V1)
       if (Program_run_state == PR_RUNNING || Program_run_state == PR_PAUSED || Program_run_state == PR_THRESHOLD) {
+        // KilnPID.Compute();
         if (KilnPID.Compute()) windowStartTime = millis();
 
-        DBG dbgLog(LOG_INFO, "[PRG] Now:%d windowStartTime:%d nextSwitchTime:%d Now-window:%d Pid_out:%.2f SSR_On:%d\n", now, windowStartTime, nextSwitchTime, now - windowStartTime, pid_out, SSR_On);
+        DBG dbgLog(LOG_INFO, "[PRG] Now:%d windowStartTime:%d nextSwitchTime:%d Now-window:%d Pid_out:%.2f SSR_On:%d\n", now, windowStartTime, nextSwitchTime, (long)(millis() - windowStartTime), pid_out, SSR_On);
 
-        if (!SSR_On && ((pid_out * PID_WINDOW_DIVIDER) > (now - windowStartTime))) {
+        if (!SSR_On && ((pid_out * PID_WINDOW_DIVIDER) > (long)(now - windowStartTime))) {
           if (now > nextSwitchTime) {
             nextSwitchTime = now + Prefs[PRF_PID_WINDOW].value.uint16;
             Enable_SSR();
           }
-        } else if (SSR_On && ((pid_out == 0) || (pid_out * PID_WINDOW_DIVIDER) < (now - windowStartTime))) {
-          nextSwitchTime = now + Prefs[PRF_PID_WINDOW].value.uint16;
+        } else {
+          if (SSR_On) {
+            nextSwitchTime = now + Prefs[PRF_PID_WINDOW].value.uint16;
+          }
           Disable_SSR();
         }
+#endif
+#ifdef PID_AUTOTUNEPID
+        if (Program_run_state == PR_RUNNING || Program_run_state == PR_PAUSED || Program_run_state == PR_THRESHOLD || Program_run_state == PR_CALIBRATE) {
+          DBG dbgLog(LOG_DEBUG, "[PRG] kiln_temp: %.2f\n", kiln_temp);
+          float input = kiln_temp;
+          KilnPID.update(input);
+          float output = KilnPID.getOutput();
+          pid_out = output;
+
+          DBG dbgLog(LOG_INFO, "[PRG] Now:%d nextSwitchTime:%d Pid_out:%.2f SSR_On:%d\n", now, nextSwitchTime, output, SSR_On);
+          // if ((long)(now - windowStartTime) > Prefs[PRF_PID_WINDOW].value.uint16) {
+          // windowStartTime += Prefs[PRF_PID_WINDOW].value.uint16;
+          // }
+          if (!SSR_On && output > 0) {
+            if (now > nextSwitchTime) {
+              nextSwitchTime = now + Prefs[PRF_PID_WINDOW].value.uint16;
+              Enable_SSR();
+            }
+          } else {
+            if (SSR_On) {
+              nextSwitchTime = now + Prefs[PRF_PID_WINDOW].value.uint16;
+            }
+            Disable_SSR();
+          }
+#endif
+        }
       }
+
+      // yield();
+      vTaskDelay(10);  // This should enable to run other tasks on this core
     }
-
-    // yield();
-    vTaskDelay(10);  // This should enable to run other tasks on this core
   }
-}
 
-/*
+  /*
 ** Main setup function for programs module
 */
-void Program_Setup() {
+  void Program_Setup() {
 
-  // Start interupt timer handler - 1s
-  // Create semaphore to inform us when the timer has fired
-  timerSemaphore = xSemaphoreCreateBinary();
+    // Start interupt timer handler - 1s
+    // Create semaphore to inform us when the timer has fired
+    timerSemaphore = xSemaphoreCreateBinary();
 
-  // has now only 1 parameter (frequency). There is an automatic calculation of the divider using different clock sources to achieve the selected frequency.
-  timer = timerBegin(1000000);
+    // has now only 1 parameter (frequency). There is an automatic calculation of the divider using different clock sources to achieve the selected frequency.
+    timer = timerBegin(1000000);
 
-  // Attach onTimer function to our timer.
-  timerAttachInterrupt(timer, &onTimer);
+    // Attach onTimer function to our timer.
+    timerAttachInterrupt(timer, &onTimer);
 
-  // Set alarm to call onTimer function every second (value in microseconds).
-  // Repeat the alarm (third parameter)
-  timerAlarm(timer, 1000000, true, 0);
+    // Set alarm to call onTimer function every second (value in microseconds).
+    // Repeat the alarm (third parameter)
+    timerAlarm(timer, 1000000, true, 0);
 
 
-  // For testing!!!
-  //  Load_program("test_up_down.txt");
-  //  Load_program_to_run();
+    // For testing!!!
+    //  Load_program("test_up_down.txt");
+    //  Load_program_to_run();
 
-  xTaskCreatePinnedToCore(
-    //  xTaskCreate(
-    Program_Loop,   /* Task function. */
-    "Program_loop", /* String with name of task. */
-    8192,           /* Stack size in bytes. */
-    NULL,           /* Parameter passed as input of the task */
-    1,              /* Priority of the task. */
-    NULL, 0);       /* Task handle. */
-}
+    xTaskCreatePinnedToCore(
+      //  xTaskCreate(
+      Program_Loop,   /* Task function. */
+      "Program_loop", /* String with name of task. */
+      8192,           /* Stack size in bytes. */
+      NULL,           /* Parameter passed as input of the task */
+      1,              /* Priority of the task. */
+      NULL, 0);       /* Task handle. */
+  }

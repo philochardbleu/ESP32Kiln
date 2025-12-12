@@ -630,8 +630,10 @@ String handleVars(const String &var) {
 
   if (var == "KILN_TEMP") return String(kiln_temp);
   else if (var == "SET_TEMP") return String(set_temp);
+#ifdef MAX31865_E
   else if (var == "ENV_TEMP") return String(int_temp);
   else if (var == "CASE_TEMP") return String(case_temp);
+#endif
   else if (var == "HEAT_TIME") return String((pid_out * PID_WINDOW_DIVIDER / Prefs[PRF_PID_WINDOW].value.uint16) * 100);
   else if (var == "TEMP_CHANGE") return String(temp_incr);
   else if (var == "STEP") {

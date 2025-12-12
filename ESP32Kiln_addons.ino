@@ -2,11 +2,22 @@
 ** Function for relays (SSR, EMR) and temperature sensors
 **
 */
-#include <MAX31855.h>
+SPIClass *ESP32_SPI = new SPIClass(HSPI);
+// #include <MAX31855.h>
+#define MAX6675_E
+#ifdef MAX6675_E
+#include "MAX6675.h"
+#define CS_PIN 27
+#define DATA_PIN 12
+#define CLOCK_PIN 14
+
+MAX6675 ThermocoupleA(CS_PIN, DATA_PIN, CLOCK_PIN);
+#endif
 
 // Initialize SPI and MAX31855
-SPIClass *ESP32_SPI = new SPIClass(HSPI);
-MAX31855 ThermocoupleA(MAXCS1);
+// MAX31855 ThermocoupleA(MAXCS1);
+
+
 
 // If we have defines power meter pins
 #ifdef ENERGY_MON_PIN
@@ -31,6 +42,8 @@ boolean SSR_On;  // just to narrow down state changes.. I don't know if this is 
 void Enable_SSR() {
   if (!SSR_On) {
     digitalWrite(SSR1_RELAY_PIN, HIGH);
+    DBG dbgLog(LOG_DEBUG, "[ADDONS] SSR 1 Enabled\n");
+
 #ifdef SSR2_RELAY_PIN
     digitalWrite(SSR2_RELAY_PIN, HIGH);
 #endif
@@ -41,11 +54,17 @@ void Enable_SSR() {
 void Disable_SSR() {
   if (SSR_On) {
     digitalWrite(SSR1_RELAY_PIN, LOW);
+    DBG dbgLog(LOG_DEBUG, "[ADDONS] SSR 1 Disabled\n");
 #ifdef SSR2_RELAY_PIN
     digitalWrite(SSR2_RELAY_PIN, LOW);
 #endif
     SSR_On = false;
   }
+}
+
+void SSR_Off() {
+  digitalWrite(SSR1_RELAY_PIN, LOW);
+  DBG dbgLog(LOG_DEBUG, "[ADDONS] SSR 1 Disabled\n");
 }
 
 #ifdef EMR_RELAY_PIN
@@ -70,6 +89,28 @@ void print_bits(uint32_t raw) {
 
 // ThermocoupleA temperature readout
 //
+#ifdef MAX6675_E
+void Update_TemperatureA() {
+  int status = ThermocoupleA.read();
+  float kiln_tmp1 = 0;
+
+  float count = 0;
+
+  for (int i = 10; i > 0; i--) {
+    if (ThermocoupleA.read() == STATUS_OK) {
+      float temp = ThermocoupleA.getCelsius();
+      kiln_tmp1 += temp;
+      count += 1;
+    }
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+  if (count > 0) {
+    kiln_temp = (float)(kiln_tmp1 / count);
+  }
+  DBG dbgLog(LOG_DEBUG, "[ADDONS] Temperature sensor A readout: Kiln temp = %.1f\n", kiln_temp);
+}
+#endif
+#ifdef MAX31865
 void Update_TemperatureA() {
   uint32_t raw;
   float kiln_tmp1 = 0;
@@ -127,6 +168,7 @@ void Update_TemperatureA() {
 
   DBG dbgLog(LOG_DEBUG, "[ADDONS] Temperature sensor A readout: Internal temp = %.1f \t Average kiln temp = %.1f\n", int_temp, kiln_temp);
 }
+#endif
 
 
 #ifdef MAXCS2
@@ -261,7 +303,9 @@ void Setup_Addons() {
 #endif
 
   SSR_On = false;
-  ThermocoupleA.begin(ESP32_SPI);
+  ThermocoupleA.begin();
+  ThermocoupleA.setSPIspeed(4000000);
+  // ThermocoupleA.begin(ESP32_SPI);
 #ifdef MAXCS2
   ThermocoupleB.begin(ESP32_SPI);
 #endif

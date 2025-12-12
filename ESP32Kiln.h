@@ -1,4 +1,4 @@
-#include <QuickPID.h>
+
 #include <Syslog.h>
 #include <map>
 
@@ -20,6 +20,10 @@ const int MAX_Prog_File_Size = 10240;  // maximum file size (bytes) that can be 
 **
 */
 
+// #define PID_QUICKPID
+#define PID_PID_V1
+// #define PID_AUTOTUNEPID
+
 // #define EMR_RELAY_PIN 21
 #define SSR1_RELAY_PIN 19
 //#define SSR2_RELAY_PIN 22   // if you want to use additional SSR for second heater, uncoment this
@@ -40,18 +44,34 @@ uint16_t ALARM_countdown = 0;  // countdown in seconds to stop alarm
 ** Temperature, PID and probes variables/definitions
 */
 // Temperature & PID variables
-float int_temp = 20, kiln_temp = 20, case_temp = 20;
-float set_temp, pid_out;
 float temp_incr = 0;
 #define PID_WINDOW_DIVIDER 100
+#define MIN_WINDOW 5
 volatile unsigned long windowStartTime, nextSwitchTime, now;
 
-//Specify the links and initial tuning parameters
+#ifdef PID_QUICKPID
+float int_temp = 20, case_temp = 20;
+float set_temp, pid_out, kiln_temp = 20;
+#include <QuickPID.h>
 QuickPID KilnPID(&kiln_temp, &pid_out, &set_temp, 0, 0, 0,
                  KilnPID.pMode::pOnError,
                  KilnPID.dMode::dOnError,
                  KilnPID.iAwMode::iAwClamp,
                  KilnPID.Action::direct);
+#endif
+
+#ifdef PID_PID_V1
+#include <PID_v1.h>
+double int_temp = 20, case_temp = 20;
+double set_temp, pid_out, kiln_temp = 20;
+PID KilnPID(&kiln_temp, &pid_out, &set_temp, 0, 0, 0, P_ON_M, DIRECT);
+#endif
+
+#ifdef PID_AUTOTUNEPID
+#include <AutoTunePID.h>
+float set_temp, pid_out, kiln_temp = 20;
+AutoTunePID KilnPID(0, 1, TuningMethod::Manual);
+#endif
 
 /*
 ** Global value of LCD screen/menu and menu position
@@ -374,3 +394,7 @@ void LCD_Display_quick_program(int dir = 0, byte pos = 0);
 uint8_t Cleanup_program(uint8_t err = 0);
 uint8_t Load_program(char *file = 0);
 void ABORT_Program(uint8_t error = 0);
+
+#if (defined (PID_PID_V1) && defined (PID_QUICKPID)) || (defined(PID_PID_V1) && defined(PID_AUTOTUNEPID)) || (defined(PID_AUTOTUNEPID) && defined(PID_QUICKPID))
+#error Multiple PID types defined
+#endif

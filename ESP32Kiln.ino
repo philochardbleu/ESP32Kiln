@@ -104,6 +104,11 @@ boolean valid_filename(char *file) {
 // Main setup that invokes other subsetups to initialize other modules
 //
 void setup() {
+
+#if defined(PID_AUTOTUNEPID)
+  KilnPID.setSetpoint(20);
+  KilnPID.setManualGains(2.0, 0.5, 1.0);
+#endif
   char msg[MAX_CHARS_PL];
 
   // This should disable watchdog killing asynctcp and others - one of this should work :)

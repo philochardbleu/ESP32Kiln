@@ -366,13 +366,22 @@ void LCD_display_mainv1() {
   }
 
   // Temperatures - current, target, environment
+#ifdef MAX31865_E
   sprintf(msg, "Ct:%4.0fC St:%4.0fC Amb:%2.0fC", kiln_temp, set_temp, int_temp);
+#else
+  sprintf(msg, "Ct:%4.0fC St:%4.0fC", kiln_temp, set_temp);
+#endif
   u8g2.drawStr(x, y += chh, msg);
 
   // Print Step number/all steps and if it's Run od Dwell, print proportional heat time of SSR and case temperature
   //if(Program_run_step>-1) sprintf(msg,"Stp:%d/%d%c Ht:%3.0f%%  Cse:%2dC",Program_run_step+1,Program_run_size,(temp_incr!=0)?'r':'d',(pid_out/Prefs[PRF_PID_WINDOW].value.uint16)*100.0);
+#ifdef MAX31865_E
   if (Program_run_step > -1) sprintf(msg, "Stp:%d/%d%c Ht:%3.0f%% Cse:%.0fC", Program_run_step + 1, Program_run_size, (temp_incr != 0) ? 'r' : 'd', (pid_out / Prefs[PRF_PID_WINDOW].value.uint16) * 100 * PID_WINDOW_DIVIDER, case_temp);
   else sprintf(msg, "Stp:0/%d r/d Ht:0%% Cse:%.0fC", Program_run_size, case_temp);
+#else
+  if (Program_run_step > -1) sprintf(msg, "Stp:%d/%d%c Ht:%3.0f%%", Program_run_step + 1, Program_run_size, (temp_incr != 0) ? 'r' : 'd', (pid_out / Prefs[PRF_PID_WINDOW].value.uint16) * 100 * PID_WINDOW_DIVIDER);
+  else sprintf(msg, "Stp:0/%d r/d Ht:0%%", Program_run_size);
+#endif
   u8g2.drawStr(x, y += chh - 1, msg);
 
   u8g2.sendBuffer();

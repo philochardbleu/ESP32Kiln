@@ -74,7 +74,7 @@ struct tm timeinfo,*tmm;
     tmp=String(str)+","+String(kiln_temp,0)+","+String(case_temp,0)+","+String((int)(Energy_Usage-EnW_last));
     EnW_last=Energy_Usage;
 #else
-    tmp=String(str)+","+String(kiln_temp,0)+","+String(case_temp,0);
+    tmp=String(str)+","+String(kiln_temp,0);
 #endif
 
   DBG dbgLog(LOG_INFO,"[LOG] Writing to log file:%s\n",tmp.c_str());
