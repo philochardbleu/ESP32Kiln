@@ -29,7 +29,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
-#include <FS.h>   // Include the SPIFFS library
+#include <FS.h>  // Include the SPIFFS library
 #include <SPIFFS.h>
 #include <ESPAsyncWebServer.h>
 #include <rtc_wdt.h>
@@ -43,12 +43,12 @@
 */
 
 // If you have Wrover with PSRAM
-//#define MALLOC ps_malloc
-//#define REALLOC ps_realloc
+#define MALLOC ps_malloc
+#define REALLOC ps_realloc
 
 // if you have Wroom without it
-#define MALLOC malloc
-#define REALLOC realloc
+// #define MALLOC malloc
+// #define REALLOC realloc
 
 #define DEBUG true
 //#define DEBUG false
@@ -56,32 +56,32 @@
 
 // Close cleanly file and delete file from SPIFFS
 //
-boolean delete_file(File &newFile){
-char filename[32];
- if(newFile){
-    strcpy(filename,newFile.name());
-    DBG dbgLog(LOG_DEBUG,"[MAIN] Deleting uploaded file: \"%s\"\n",filename);
+boolean delete_file(File &newFile) {
+  char filename[32];
+  if (newFile) {
+    strcpy(filename, newFile.name());
+    DBG dbgLog(LOG_DEBUG, "[MAIN] Deleting uploaded file: \"%s\"\n", filename);
     newFile.flush();
     newFile.close();
-    if(SPIFFS.remove(filename)){
-      DBG dbgLog(LOG_DEBUG,"[MAIN] Deleted!");
+    if (SPIFFS.remove(filename)) {
+      DBG dbgLog(LOG_DEBUG, "[MAIN] Deleted!");
     }
-    Generate_INDEX(); // Just in case user wanted to overwrite existing file
+    Generate_INDEX();  // Just in case user wanted to overwrite existing file
     return true;
- }else return false;
+  } else return false;
 }
 
 
 // Function check is uploaded file has only ASCII characters - this to be modified in future, perhaps to even narrowed down.
 // Currently excluded are non printable characters, except new line and [] brackets. [] are excluded mostly for testing purpose.
 // This way it should be faster then traversing char array
-boolean check_valid_chars(byte a){
-  if(a==0 || a==9 || a==95) return true; // end of file, tab, _
-  if(a==10 || a==13) return true; // new line - Line Feed, Carriage Return
-  if(a>=32 && a<=90) return true; // All basic characters, capital letters and numbers
-  if(a>=97 && a<=122) return true; // small letters
+boolean check_valid_chars(byte a) {
+  if (a == 0 || a == 9 || a == 95) return true;  // end of file, tab, _
+  if (a == 10 || a == 13) return true;           // new line - Line Feed, Carriage Return
+  if (a >= 32 && a <= 90) return true;           // All basic characters, capital letters and numbers
+  if (a >= 97 && a <= 122) return true;          // small letters
   DBG Serial.print("[MAIN]  Faulty character ->");
-  DBG Serial.print(a,DEC);
+  DBG Serial.print(a, DEC);
   DBG Serial.print(" ");
   DBG Serial.write(a);
   DBG Serial.println();
@@ -91,10 +91,10 @@ boolean check_valid_chars(byte a){
 
 // Check filename if it has only letters, numbers and . _ characters - other are not allowed for easy parsing and transfering
 //
-boolean valid_filename(char *file){
-char c;
-  while (c = *file++){
-    if(strchr(allowed_chars_in_filename,c)) continue; // if every letter is on allowed list - we are good to go
+boolean valid_filename(char *file) {
+  char c;
+  while (c = *file++) {
+    if (strchr(allowed_chars_in_filename, c)) continue;  // if every letter is on allowed list - we are good to go
     else return false;
   }
   return true;
@@ -106,12 +106,12 @@ char c;
 void setup() {
   char msg[MAX_CHARS_PL];
 
-// This should disable watchdog killing asynctcp and others - one of this should work :)
-// This is not recommended, but if Webserver/AsyncTCP will hang (that has happen to me) - this will at least do not reset the device (and potentially ruin program).
-// ESP32 will continue to work properly even in AsynTCP will hang - there will be no HTTP connection. If you do not like this - comment out next 6 lines.
+  // This should disable watchdog killing asynctcp and others - one of this should work :)
+  // This is not recommended, but if Webserver/AsyncTCP will hang (that has happen to me) - this will at least do not reset the device (and potentially ruin program).
+  // ESP32 will continue to work properly even in AsynTCP will hang - there will be no HTTP connection. If you do not like this - comment out next 6 lines.
   esp_task_wdt_config_t config = {
-    .timeout_ms = 60* 1000,  //  60 seconds
-    .trigger_panic = true,     // Trigger panic if watchdog timer is not reset
+    .timeout_ms = 60 * 1000,  //  60 seconds
+    .trigger_panic = true,    // Trigger panic if watchdog timer is not reset
   };
   esp_task_wdt_reconfigure(&config);
   rtc_wdt_protect_off();
@@ -127,46 +127,48 @@ void setup() {
 
   // Initialize SPIFFS
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
-    DBG dbgLog(LOG_DEBUG,"[MAIN] An Error has occurred while mounting SPIFFS\n");
+    DBG dbgLog(LOG_DEBUG, "[MAIN] An Error has occurred while mounting SPIFFS\n");
     return;
   }
 
   // Load all preferences from disk
   Load_prefs();
-  
+
   // Setup function for LCD display from ESP32Kiln_LCD.ino
   Setup_LCD();
 
+#ifdef ENCODER0_PINA
   // Setup input devices
   Setup_Input();
-  
-  DBG dbgLog(LOG_DEBUG,"WiFi mode: %d, Retry count: %d, is wifi enabled: %d\n",Prefs[PRF_WIFI_MODE].value.uint8,Prefs[PRF_WIFI_RETRY_CNT].value.uint8,Prefs[PRF_WIFI_SSID].type);
-  
+#endif
+
+  DBG dbgLog(LOG_DEBUG, "WiFi mode: %d, Retry count: %d, is wifi enabled: %d\n", Prefs[PRF_WIFI_MODE].value.uint8, Prefs[PRF_WIFI_RETRY_CNT].value.uint8, Prefs[PRF_WIFI_SSID].type);
+
   // Connect to WiFi if enabled
-  if(Prefs[PRF_WIFI_MODE].value.uint8){ // If we want to have WiFi
-    strcpy(msg,"connecting WiFi..");
+  if (Prefs[PRF_WIFI_MODE].value.uint8) {  // If we want to have WiFi
+    strcpy(msg, "connecting WiFi..");
     load_msg(msg);
-    if(Setup_WiFi()){    // !!! Wifi connection FAILED
-      DBG dbgLog(LOG_ERR,"[MAIN] WiFi connection failed\n");
-      strcpy(msg," WiFi con. failed");
+    if (Setup_WiFi()) {  // !!! Wifi connection FAILED
+      DBG dbgLog(LOG_ERR, "[MAIN] WiFi connection failed\n");
+      strcpy(msg, " WiFi con. failed");
       load_msg(msg);
-    }else{
+    } else {
       IPAddress lips;
-     
-      Return_Current_IP(lips); 
-      DBG Serial.println(lips); // Print ESP32 Local IP Address
-      
-      sprintf(msg," IP: %s",lips.toString().c_str());
+
+      Return_Current_IP(lips);
+      DBG Serial.println(lips);  // Print ESP32 Local IP Address
+
+      sprintf(msg, " IP: %s", lips.toString().c_str());
       load_msg(msg);
 
       // Setup OTA
       setup_OTA("ESP32Kiln");
     }
-  }else{
+  } else {
     // If we don't have Internet - assume there is no time set
-    Setup_start_date(); // in ESP32Kiln_net
+    Setup_start_date();  // in ESP32Kiln_net
     Disable_WiFi();
-    strcpy(msg,"   -- Started! --");
+    strcpy(msg, "   -- Started! --");
     load_msg(msg);
   }
 
@@ -175,7 +177,7 @@ void setup() {
 
   // Loads logs index
   Load_LOGS_Dir();
-  
+
   // Clean logs (if neede) on start - this will also call logs index generator
   Clean_LOGS();
 

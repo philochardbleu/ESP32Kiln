@@ -160,6 +160,8 @@ var chart = new Chart(ctx, %CONFIG%);
 
 function chart_update(){
 //  console.log("Updating chart");
+	rand = Math.random();
+	chart.options.plugins.datasource.url = '%LOG_FILE%' + `?q=${Math.random()}`;
   chart.update();
   chart_update_id=setTimeout(chart_update, 30000);
 }
