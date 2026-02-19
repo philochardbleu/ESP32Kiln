@@ -1,3 +1,6 @@
+1.7.1 (2026.02.19)
+SPIFFS to LittleFS to ease upload with Arduino 2.x.x (CTRL+Shift + P and Upload LittleFS ....)).
+
 1.7 (2025.07.23)
 - completed auto PID tuning.
 
