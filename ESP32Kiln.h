@@ -218,12 +218,12 @@ uint16_t Logs_DIR_size = 0;
 /* Directory loading errors:
 ** 1 - cant open "/programs" directory
 ** 2 - file name is too long or too short (this should not happened)
-** 3 - 
+** 3 - LittleFSsettings
 */
 
 
 /* 
-** Spiffs settings
+** LittleFSsettings
 **
 */
 #define PRG_DIRECTORY "/programs"
@@ -368,8 +368,8 @@ File CSVFile, LOGFile;
 ** Other stuff
 **
 */
-const char *PVer = "ESP32Kiln v1.7";
-const char *PDate = "2025.07.23";
+const char *PVer = "ESP32Kiln v1.8";
+const char *PDate = "2026.02.19";
 
 // If defined debug - do debug, otherwise comment out all debug lines
 #define DBG if (DEBUG)
