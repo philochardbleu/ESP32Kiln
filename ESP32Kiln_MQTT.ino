@@ -3,9 +3,9 @@
 
 extern double kiln_tmp1;
 bool ha_discovery_sent = false;
-const char* mqtt_server = "192.168.1.5";
-const char* mqtt_user = "philochardbleu";
-const char* mqtt_password = "Gouph123";
+const char* mqtt_server = "server adress";
+const char* mqtt_user = "server user";
+const char* mqtt_password = "server password";
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -142,3 +142,4 @@ void mqtt_publish_discovery()
 
   Serial.println("[MQTT] discovery HA publié");
 }
+
