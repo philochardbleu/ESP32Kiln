@@ -29,13 +29,12 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
-#include <FS.h>  // Include the SPIFFS library
-#include <SPIFFS.h>
+#include <FS.h>  // Include the LittleFS library
 #include <ESPAsyncWebServer.h>
 #include <rtc_wdt.h>
 #include <esp_task_wdt.h>
-
 #include "ESP32Kiln.h"
+#include<LittleFS.h>
 
 /* 
 ** Static, editable parameters. Some of them, can be replaces with ESP32Kiln preferences.
@@ -54,7 +53,7 @@
 //#define DEBUG false
 
 
-// Close cleanly file and delete file from SPIFFS
+// Close cleanly file and delete file from LittleFS
 //
 boolean delete_file(File &newFile) {
   char filename[32];
@@ -63,7 +62,7 @@ boolean delete_file(File &newFile) {
     DBG dbgLog(LOG_DEBUG, "[MAIN] Deleting uploaded file: \"%s\"\n", filename);
     newFile.flush();
     newFile.close();
-    if (SPIFFS.remove(filename)) {
+    if (LittleFS.remove(filename)) {
       DBG dbgLog(LOG_DEBUG, "[MAIN] Deleted!");
     }
     Generate_INDEX();  // Just in case user wanted to overwrite existing file
@@ -104,6 +103,11 @@ boolean valid_filename(char *file) {
 // Main setup that invokes other subsetups to initialize other modules
 //
 void setup() {
+    LittleFS.begin(true);
+    if(!LittleFS.exists("/logs")){
+    LittleFS.mkdir("/logs");
+}
+
 
 #if defined(PID_AUTOTUNEPID)
   KilnPID.setSetpoint(20);
@@ -130,9 +134,9 @@ void setup() {
   // Serial port for debugging purposes
   initSerial();
 
-  // Initialize SPIFFS
-  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
-    DBG dbgLog(LOG_DEBUG, "[MAIN] An Error has occurred while mounting SPIFFS\n");
+  // Initialize LittleFS
+if (!LittleFS.begin(true))  {
+    DBG dbgLog(LOG_DEBUG, "[MAIN] An Error has occurred while mounting LittleFS\n");
     return;
   }
 
