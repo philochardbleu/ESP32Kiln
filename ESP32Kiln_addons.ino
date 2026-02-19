@@ -108,6 +108,7 @@ void Update_TemperatureA() {
     kiln_temp = (float)(kiln_tmp1 / count);
   }
   DBG dbgLog(LOG_DEBUG, "[ADDONS] Temperature sensor A readout: Kiln temp = %.1f\n", kiln_temp);
+  mqtt_tick();
 }
 #endif
 #ifdef MAX31865
