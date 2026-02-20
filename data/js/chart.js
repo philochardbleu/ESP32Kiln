@@ -48,6 +48,8 @@ var config_with = {
 			text: 'Set program: %PROGRAM_NAME% vs actual temperature'
 		},
 		responsive: true,
+		maintainAspectRatio: true,
+		aspectRatio: window.innerWidth < 600 ? 1 : 2,
 		scales: {
 			xAxes: [{
 				type: 'time',
@@ -124,6 +126,8 @@ var config_without = {
 			text: 'Ready to run program temperature/time graph'
 		},
 		responsive: true,
+		maintainAspectRatio: true,
+		aspectRatio: window.innerWidth < 600 ? 1 : 2,
 		scales: {
 			xAxes: [{
 				type: 'time',
