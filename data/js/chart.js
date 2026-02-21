@@ -1,3 +1,4 @@
+
 var ctx = document.getElementById('ProgramChart').getContext('2d');
 var chart_update_id;
 
