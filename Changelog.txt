@@ -1,5 +1,6 @@
 1.8
-Introducing MQTT (with discovery) for temperatures (can be extended to other data).The published mames are unchanged : PIDKiln instead of ESP32Kiln. Don't forget to fill the server data in ESP32Kiln_MQTT.ino !
+Introducing MQTT (with discovery) for all variables.The published mames are unchanged : PIDKiln instead of ESP32Kiln. Don't forget to fill the server data in ESP32Kiln_MQTT.ino !
+Better chart display on mobile phone
 
 1.7.1 (2026.02.19)
 SPIFFS to LittleFS to ease upload with Arduino 2.x.x (CTRL+Shift + P and Upload LittleFS ....)).
