@@ -1,4 +1,3 @@
-
 var ctx = document.getElementById('ProgramChart').getContext('2d');
 var chart_update_id;
 
@@ -49,8 +48,6 @@ var config_with = {
 			text: 'Set program: %PROGRAM_NAME% vs actual temperature'
 		},
 		responsive: true,
-		maintainAspectRatio: true,
-		aspectRatio: window.innerWidth < 600 ? 1 : 2,
 		scales: {
 			xAxes: [{
 				type: 'time',
@@ -60,9 +57,10 @@ var config_with = {
 						millisecond: 'HH:mm:ss.SSS',
 						second: 'HH:mm:ss',
 						minute: 'HH:mm',
-						hour: 'HH'
+						hour: 'HH[h]'
 					},
-//					unit: 'minute'
+					unit: 'hour',
+					stepSize: 1
 				},
 				scaleLabel: {
 					display: true,
@@ -127,8 +125,6 @@ var config_without = {
 			text: 'Ready to run program temperature/time graph'
 		},
 		responsive: true,
-		maintainAspectRatio: true,
-		aspectRatio: window.innerWidth < 600 ? 1 : 2,
 		scales: {
 			xAxes: [{
 				type: 'time',
@@ -138,9 +134,10 @@ var config_without = {
 						millisecond: 'HH:mm:ss.SSS',
 						second: 'HH:mm:ss',
 						minute: 'HH:mm',
-						hour: 'HH'
+						hour: 'HH[h]'
 					},
-//					unit: 'minute'
+					unit: 'hour',
+					stepSize: 1
 				},
 				scaleLabel: {
 					display: true,
